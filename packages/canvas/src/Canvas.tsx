@@ -27,20 +27,16 @@ export function Canvas({
 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stableEngineRef = useRef<CanvasEngine | null>(null);
-  
+
   const engineRef = externalEngineRef ?? stableEngineRef;
 
   useEffect(() => {
     if (!canvasRef.current) {
       return;
     }
-
     // 初始化引擎
     const engine = new CanvasEngine(canvasRef.current);
-    // Set our stableEngineRef always
     stableEngineRef.current = engine;
-
-    // If using an external ref, sync it *at mount* (do not modify it on every render)
     if (externalEngineRef) {
       externalEngineRef.current = engine;
     }
@@ -91,8 +87,7 @@ export function Canvas({
         externalEngineRef.current = null;
       }
     };
-    // We purposely do not include onElementSelected, externalEngineRef, etc, since engine should only be created/destroyed once
-  }, []); // 注意：onElementSelected 在初始化时设置，后续变化不会更新
+  }, []);
 
   // 更新选中回调（当 prop 变化时）
   useEffect(() => {

@@ -2,69 +2,72 @@ import { useState, useRef } from "react";
 import { Canvas } from "@canvas/canvas";
 import { InteractionMode, CanvasEngine } from "@canvas/core";
 import type { IElement } from "@canvas/elements";
+import { generateRandomElements, formatPerformanceResult, logPerformanceResult } from "./utils/performanceTest";
 import "./App.css";
 
 function App() {
   const [mode, setMode] = useState<InteractionMode>(InteractionMode.SELECT);
   const [selectedElement, setSelectedElement] = useState<IElement | null>(null);
+  const [elementCount, setElementCount] = useState(0);
   const engineRef = useRef<CanvasEngine | null>(null);
 
-  return (
-    <div style={{ padding: "20px" }}>
-      <h1>Canvas 协作白板引擎</h1>
-      <h3>
-        缩放：在画布上滚动鼠标滚轮 <br />
-        平移： 按住鼠标中键拖拽 或按住空格键 + 鼠标左键拖拽
-      </h3>
+  /**
+   * 处理性能测试按钮点击
+   */
+  const handlePerformanceTest = () => {
+    if (!engineRef.current) {
+      return;
+    }
 
-      <div style={{ marginBottom: "20px" }}>
+    const result = generateRandomElements(engineRef.current, 10000, 600, 400);
+    setElementCount(result.count);
+    
+    logPerformanceResult(result);
+    alert(formatPerformanceResult(result));
+  };
+
+  return (
+    <div className="app-container">
+      <h1 className="app-title">Canvas 协作白板引擎</h1>
+      <div className="app-subtitle">
+        缩放：在画布上滚动鼠标滚轮 <br />
+        平移：按住鼠标中键拖拽 或按住空格键 + 鼠标左键拖拽
+      </div>
+
+      <div className="button-group">
         <button
+          className={`btn btn-mode ${mode === InteractionMode.SELECT ? 'active' : ''}`}
           onClick={() => setMode(InteractionMode.SELECT)}
-          style={{
-            marginRight: "10px",
-            padding: "8px 16px",
-            backgroundColor:
-              mode === InteractionMode.SELECT ? "#3b82f6" : "#e5e7eb",
-            color: mode === InteractionMode.SELECT ? "white" : "black",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
         >
           选择模式
         </button>
         <button
+          className={`btn btn-mode ${mode === InteractionMode.PEN ? 'active' : ''}`}
           onClick={() => setMode(InteractionMode.PEN)}
-          style={{
-            marginRight: "10px",
-            padding: "8px 16px",
-            backgroundColor:
-              mode === InteractionMode.PEN ? "#3b82f6" : "#e5e7eb",
-            color: mode === InteractionMode.PEN ? "white" : "black",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
         >
           画笔
         </button>
         <button
+          className={`btn btn-mode ${mode === InteractionMode.RECTANGLE ? 'active' : ''}`}
           onClick={() => setMode(InteractionMode.RECTANGLE)}
-          style={{
-            padding: "8px 16px",
-            backgroundColor:
-              mode === InteractionMode.RECTANGLE ? "#3b82f6" : "#e5e7eb",
-            color: mode === InteractionMode.RECTANGLE ? "white" : "black",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
         >
           矩形
         </button>
+        <button
+          className="btn btn-performance"
+          onClick={handlePerformanceTest}
+        >
+          生成 10,000 个元素（性能测试）
+        </button>
       </div>
 
-      <div style={{ position: "relative" }}>
+      {elementCount > 0 && (
+        <div className="element-count">
+          当前画布元素数量: {elementCount}
+        </div>
+      )}
+
+      <div className="canvas-container">
         <Canvas
           width={600}
           height={400}
@@ -74,23 +77,12 @@ function App() {
         />
         {selectedElement && (
           <button
+            className="btn btn-delete"
             onClick={() => {
               if (engineRef.current) {
                 engineRef.current.deleteSelectedElement();
                 setSelectedElement(null);
               }
-            }}
-            style={{
-              position: "absolute",
-              top: "10px",
-              right: "10px",
-              padding: "8px 16px",
-              backgroundColor: "#ef4444",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-              fontSize: "14px",
             }}
           >
             删除选中

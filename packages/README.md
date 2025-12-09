@@ -27,14 +27,6 @@ packages/
     └── Canvas.tsx
 ```
 
-## 🔗 依赖关系
-
-```
-canvas → core → elements → math
-                ↓
-            elements → math
-```
-
 ## 📝 使用方式
 
 ```typescript
@@ -48,13 +40,3 @@ import { InteractionMode } from '@canvas/core';
   mode={InteractionMode.PEN} 
 />
 ```
-
-## 🎯 功能
-
-- ✅ 画笔绘制（路径）
-- ✅ 矩形绘制
-- ✅ 元素选中和拖拽
-- ✅ 空间索引优化（四叉树）
-- ✅ 脏矩形渲染优化
-- ✅ 60 FPS 性能目标
-

@@ -76,7 +76,27 @@ export class Renderer {
    */
   setTransform(transform: Transform): void {
     this.transform = transform;
-    this.markDirty();
+    // 不触发全量重绘，而是标记视口区域为脏
+    // 这样在下次渲染时会使用视口裁剪
+    const viewportBounds = this.getViewportBounds();
+    this.markDirtyRegion(viewportBounds);
+  }
+
+  /**
+   * 获取当前视口边界（画布坐标）
+   */
+  private getViewportBounds(): BoundingBox {
+    const dpr = window.devicePixelRatio || 1;
+    const width = this.canvas.width / dpr;
+    const height = this.canvas.height / dpr;
+    
+    // 将屏幕坐标转换为画布坐标
+    return {
+      x: (0 - this.transform.translateX) / this.transform.scaleX,
+      y: (0 - this.transform.translateY) / this.transform.scaleY,
+      width: width / this.transform.scaleX,
+      height: height / this.transform.scaleY,
+    };
   }
 
   /**
@@ -91,6 +111,13 @@ export class Renderer {
    */
   markDirty(): void {
     this.needsFullRedraw = true;
+  }
+
+  /**
+   * 检查是否有脏区域需要重绘
+   */
+  hasDirtyRegions(): boolean {
+    return this.needsFullRedraw || this.dirtyRegions.length > 0;
   }
 
   /**
@@ -133,13 +160,18 @@ export class Renderer {
 
   /**
    * 渲染所有元素
-   * @param elements 要渲染的元素列表
+   * @param elements 要渲染的元素列表（仅在需要时使用，已废弃，使用空间索引查询）
    * @param forceFullRedraw 强制全量重绘（用于临时预览）
    */
-  render(elements: IElement[], forceFullRedraw: boolean = false): void {
+  render(_elements: IElement[], forceFullRedraw: boolean = false): void {
     if (this.needsFullRedraw || forceFullRedraw) {
       this.clearCanvas();
-      this.renderElements(elements);
+      
+      // 使用视口裁剪：只渲染可见元素
+      const viewportBounds = this.getViewportBounds();
+      const visibleElements = this.spatialIndex.query(viewportBounds);
+      this.renderElements(visibleElements);
+      
       this.needsFullRedraw = false;
       this.dirtyRegions = [];
       return;

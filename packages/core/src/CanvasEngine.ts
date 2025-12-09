@@ -84,10 +84,29 @@ export class CanvasEngine {
         this.renderer.markDirty();
         // 注意：外部回调通过 onElementSelected 方法设置
       },
-      onElementMoved: () => {
-        // 拖拽时强制全量重绘，避免残影问题
-        // 因为选中边框可能超出元素边界框，脏矩形优化难以精确处理
-        this.renderer.markDirty();
+      onElementMoved: (element, _deltaX, _deltaY, oldBounds) => {
+        // 只标记旧位置和新位置的脏矩形，避免全量重绘
+        // 扩大区域以包含选中边框（可能比元素边界框大）
+        const padding = 10; // 额外的边距，确保选中边框被完全清除
+        
+        if (oldBounds) {
+          const expandedOldBounds = {
+            x: oldBounds.x - padding,
+            y: oldBounds.y - padding,
+            width: oldBounds.width + padding * 2,
+            height: oldBounds.height + padding * 2,
+          };
+          this.renderer.markDirtyRegion(expandedOldBounds);
+        }
+        
+        const newBounds = element.getBoundingBox();
+        const expandedNewBounds = {
+          x: newBounds.x - padding,
+          y: newBounds.y - padding,
+          width: newBounds.width + padding * 2,
+          height: newBounds.height + padding * 2,
+        };
+        this.renderer.markDirtyRegion(expandedNewBounds);
       },
       onPathDrawing: (points: Point[]) => {
         // 实时更新路径预览
@@ -217,22 +236,30 @@ export class CanvasEngine {
    */
   private startRenderLoop(): void {
     const render = () => {
-      const elements = this.elementManager.getAll();
-      
-      // 如果有临时预览，强制全量重绘以确保预览可见
+      // 检查是否有脏区域或临时预览
       const hasTempPreview = Boolean(
         (this.tempPathPoints && this.tempPathPoints.length > 1) || this.tempRectangle
       );
+      const hasDirtyRegions = this.renderer.hasDirtyRegions();
       
-      // 渲染元素（如果有临时预览，强制全量重绘）
-      this.renderer.render(elements, hasTempPreview);
-      
-      // 渲染临时预览（在元素之上，不受裁剪影响）
-      if (this.tempPathPoints && this.tempPathPoints.length > 1) {
-        this.renderer.renderTempPath(this.tempPathPoints);
-      }
-      if (this.tempRectangle) {
-        this.renderer.renderTempRectangle(this.tempRectangle.start, this.tempRectangle.end);
+      // 只在有变化时才渲染，避免不必要的开销
+      if (hasDirtyRegions || hasTempPreview) {
+        // 只在需要全量重绘时才获取所有元素
+        // 脏矩形模式下，renderer 会使用空间索引查询，不需要所有元素
+        const elements = hasTempPreview || this.renderer['needsFullRedraw'] 
+          ? this.elementManager.getAll() 
+          : [];
+        
+        // 渲染元素（如果有临时预览，强制全量重绘）
+        this.renderer.render(elements, hasTempPreview);
+        
+        // 渲染临时预览（在元素之上，不受裁剪影响）
+        if (this.tempPathPoints && this.tempPathPoints.length > 1) {
+          this.renderer.renderTempPath(this.tempPathPoints);
+        }
+        if (this.tempRectangle) {
+          this.renderer.renderTempRectangle(this.tempRectangle.start, this.tempRectangle.end);
+        }
       }
       
       this.animationFrameId = requestAnimationFrame(render);
@@ -445,7 +472,7 @@ export class CanvasEngine {
     // 同步到各个管理器
     this.renderer.setTransform(this.transform);
     this.interactionManager.setTransform(this.transform);
-    this.renderer.markDirty();
+    // 注意：setTransform 内部已经标记了视口区域为脏，不需要 markDirty()
   }
 
   /**
@@ -475,7 +502,7 @@ export class CanvasEngine {
     // 同步到各个管理器
     this.renderer.setTransform(this.transform);
     this.interactionManager.setTransform(this.transform);
-    this.renderer.markDirty();
+    // 注意：setTransform 内部已经标记了视口区域为脏，不需要 markDirty()
 
     // 更新起始点
     this.panStartPoint = { x: clientX, y: clientY };
