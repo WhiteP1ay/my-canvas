@@ -77,6 +77,13 @@ export class InteractionManager {
   }
 
   /**
+   * 设置变换矩阵
+   */
+  setTransform(transform: Transform): void {
+    this.transform = transform;
+  }
+
+  /**
    * 设置交互模式
    */
   setMode(mode: InteractionMode): void {

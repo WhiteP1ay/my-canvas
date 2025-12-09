@@ -3,11 +3,11 @@
  * 封装 CanvasEngine，提供 React 接口
  */
 
-import { useEffect, useRef } from 'react';
-import { CanvasEngine, InteractionMode, generateId } from '@canvas/core';
-import { Rectangle, Path } from '@canvas/elements';
-import type { IElement } from '@canvas/elements';
-import type { Point } from '@canvas/math';
+import { useEffect, useRef } from "react";
+import { CanvasEngine, InteractionMode, generateId } from "@canvas/core";
+import { Rectangle, Path } from "@canvas/elements";
+import type { IElement } from "@canvas/elements";
+import type { Point } from "@canvas/math";
 
 interface CanvasProps {
   width?: number;
@@ -18,16 +18,17 @@ interface CanvasProps {
   engineRef?: React.MutableRefObject<CanvasEngine | null>;
 }
 
-export function Canvas({ 
-  width = 800, 
-  height = 600, 
+export function Canvas({
+  width = 800,
+  height = 600,
   mode = InteractionMode.SELECT,
   onElementSelected,
   engineRef: externalEngineRef,
 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const internalEngineRef = useRef<CanvasEngine | null>(null);
-  const engineRef = externalEngineRef || internalEngineRef;
+  const stableEngineRef = useRef<CanvasEngine | null>(null);
+  
+  const engineRef = externalEngineRef ?? stableEngineRef;
 
   useEffect(() => {
     if (!canvasRef.current) {
@@ -36,7 +37,13 @@ export function Canvas({
 
     // 初始化引擎
     const engine = new CanvasEngine(canvasRef.current);
-    engineRef.current = engine;
+    // Set our stableEngineRef always
+    stableEngineRef.current = engine;
+
+    // If using an external ref, sync it *at mount* (do not modify it on every render)
+    if (externalEngineRef) {
+      externalEngineRef.current = engine;
+    }
 
     // 设置选中回调
     if (onElementSelected) {
@@ -48,8 +55,8 @@ export function Canvas({
       if (points.length < 2) {
         return;
       }
-      const path = new Path(generateId('path'), points, {
-        strokeColor: '#000000',
+      const path = new Path(generateId("path"), points, {
+        strokeColor: "#000000",
         strokeWidth: 2,
         fillColor: undefined,
       });
@@ -68,9 +75,9 @@ export function Canvas({
         return;
       }
 
-      const rect = new Rectangle(generateId('rect'), x, y, w, h, {
-        fillColor: '#3b82f6',
-        strokeColor: '#1e40af',
+      const rect = new Rectangle(generateId("rect"), x, y, w, h, {
+        fillColor: "#3b82f6",
+        strokeColor: "#1e40af",
         strokeWidth: 2,
       });
       engine.addElement(rect);
@@ -79,7 +86,12 @@ export function Canvas({
     // 清理
     return () => {
       engine.destroy();
+      stableEngineRef.current = null;
+      if (externalEngineRef) {
+        externalEngineRef.current = null;
+      }
     };
+    // We purposely do not include onElementSelected, externalEngineRef, etc, since engine should only be created/destroyed once
   }, []); // 注意：onElementSelected 在初始化时设置，后续变化不会更新
 
   // 更新选中回调（当 prop 变化时）
@@ -109,10 +121,9 @@ export function Canvas({
       width={width}
       height={height}
       style={{
-        border: '1px solid #ccc',
-        cursor: mode === InteractionMode.PEN ? 'crosshair' : 'default',
+        border: "1px solid #ccc",
+        cursor: mode === InteractionMode.PEN ? "crosshair" : "default",
       }}
     />
   );
 }
-

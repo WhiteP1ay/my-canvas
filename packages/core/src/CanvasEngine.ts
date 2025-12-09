@@ -28,6 +28,10 @@ export class CanvasEngine {
   private tempPathPoints: Point[] | null = null;
   /** 临时矩形（用于矩形预览） */
   private tempRectangle: { start: Point; end: Point } | null = null;
+  
+  /** 平移状态 */
+  private isPanning: boolean = false;
+  private panStartPoint: Point | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -115,33 +119,96 @@ export class CanvasEngine {
    * 绑定事件监听器
    */
   private setupEventListeners(): void {
+    // 空格键状态
+    let spaceKeyPressed = false;
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && !e.repeat) {
+        spaceKeyPressed = true;
+        this.canvas.style.cursor = 'grab';
+      }
+    });
+    document.addEventListener('keyup', (e) => {
+      if (e.code === 'Space') {
+        spaceKeyPressed = false;
+        if (!this.isPanning) {
+          this.canvas.style.cursor = '';
+        }
+      }
+    });
+
+    // 鼠标按下
     this.canvas.addEventListener('mousedown', (e) => {
       const rect = this.canvas.getBoundingClientRect();
+      const clientX = e.clientX;
+      const clientY = e.clientY;
+      
+      // 中键（button === 1）或空格键+左键：开始平移
+      if (e.button === 1 || (e.button === 0 && spaceKeyPressed)) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.startPanning(clientX, clientY);
+        return;
+      }
+      
+      // 其他情况：正常交互
       this.interactionManager.handleMouseDown(
-        e.clientX - rect.left,
-        e.clientY - rect.top
+        clientX - rect.left,
+        clientY - rect.top
       );
     });
 
+    // 鼠标移动
     this.canvas.addEventListener('mousemove', (e) => {
       const rect = this.canvas.getBoundingClientRect();
+      
+      // 如果正在平移，处理平移
+      if (this.isPanning) {
+        e.preventDefault();
+        this.handlePanning(e.clientX, e.clientY);
+        return;
+      }
+      
+      // 否则正常交互
       this.interactionManager.handleMouseMove(
         e.clientX - rect.left,
         e.clientY - rect.top
       );
     });
 
+    // 鼠标抬起
     this.canvas.addEventListener('mouseup', (e) => {
       const rect = this.canvas.getBoundingClientRect();
+      
+      // 如果正在平移，结束平移
+      if (this.isPanning && (e.button === 1 || e.button === 0)) {
+        e.preventDefault();
+        this.stopPanning();
+        return;
+      }
+      
+      // 否则正常交互
       this.interactionManager.handleMouseUp(
         e.clientX - rect.left,
         e.clientY - rect.top
       );
     });
 
+    // 鼠标离开画布时结束平移
+    this.canvas.addEventListener('mouseleave', () => {
+      if (this.isPanning) {
+        this.stopPanning();
+      }
+    });
+
     // 防止右键菜单
     this.canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+    });
+
+    // 鼠标滚轮缩放
+    this.canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      this.handleWheel(e);
     });
   }
 
@@ -340,6 +407,87 @@ export class CanvasEngine {
   destroy(): void {
     this.stopRenderLoop();
     // 清理事件监听器等
+  }
+
+  /**
+   * 处理鼠标滚轮缩放
+   */
+  private handleWheel(e: WheelEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // 计算鼠标在画布坐标中的位置（缩放前）
+    const canvasX = (mouseX - this.transform.translateX) / this.transform.scaleX;
+    const canvasY = (mouseY - this.transform.translateY) / this.transform.scaleY;
+
+    // 缩放因子（滚轮向下缩小，向上放大）
+    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+    const minScale = 0.1;
+    const maxScale = 10;
+
+    // 计算新的缩放值
+    const newScaleX = Math.max(minScale, Math.min(maxScale, this.transform.scaleX * zoomFactor));
+    const newScaleY = Math.max(minScale, Math.min(maxScale, this.transform.scaleY * zoomFactor));
+
+    // 计算新的平移值，使鼠标位置在缩放后保持不变
+    const newTranslateX = mouseX - canvasX * newScaleX;
+    const newTranslateY = mouseY - canvasY * newScaleY;
+
+    // 更新变换矩阵
+    this.transform = {
+      scaleX: newScaleX,
+      scaleY: newScaleY,
+      translateX: newTranslateX,
+      translateY: newTranslateY,
+    };
+
+    // 同步到各个管理器
+    this.renderer.setTransform(this.transform);
+    this.interactionManager.setTransform(this.transform);
+    this.renderer.markDirty();
+  }
+
+  /**
+   * 开始平移
+   */
+  private startPanning(clientX: number, clientY: number): void {
+    this.isPanning = true;
+    this.panStartPoint = { x: clientX, y: clientY };
+    this.canvas.style.cursor = 'grabbing';
+  }
+
+  /**
+   * 处理平移
+   */
+  private handlePanning(clientX: number, clientY: number): void {
+    if (!this.panStartPoint) {
+      return;
+    }
+
+    const deltaX = clientX - this.panStartPoint.x;
+    const deltaY = clientY - this.panStartPoint.y;
+
+    // 更新平移值
+    this.transform.translateX += deltaX;
+    this.transform.translateY += deltaY;
+
+    // 同步到各个管理器
+    this.renderer.setTransform(this.transform);
+    this.interactionManager.setTransform(this.transform);
+    this.renderer.markDirty();
+
+    // 更新起始点
+    this.panStartPoint = { x: clientX, y: clientY };
+  }
+
+  /**
+   * 结束平移
+   */
+  private stopPanning(): void {
+    this.isPanning = false;
+    this.panStartPoint = null;
+    this.canvas.style.cursor = '';
   }
 }
 
