@@ -80,7 +80,9 @@ export class Path extends BaseElement {
 
   containsPoint(point: Point): boolean {
     // 对于路径，检查点是否在路径附近（容差范围内）
-    const tolerance = (this.style.strokeWidth || 2) * 2;
+    // 容差 = 线宽 * 2 + 额外的点击容差（10px），确保容易选中
+    const strokeWidth = this.style.strokeWidth || 2;
+    const tolerance = Math.max(strokeWidth * 2, 10);
     
     for (let i = 0; i < this.points.length - 1; i++) {
       const p1 = this.points[i];

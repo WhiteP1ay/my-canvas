@@ -4,7 +4,7 @@
  */
 
 import type { IElement, Transform } from '@canvas/elements';
-import type { Point } from '@canvas/math';
+import type { Point, BoundingBox } from '@canvas/math';
 import { applyInverseTransform } from '@canvas/math';
 import { SpatialIndex } from './SpatialIndex';
 
@@ -53,7 +53,7 @@ export class InteractionManager {
   
   /** 事件回调 */
   private onElementSelected?: (element: IElement | null) => void;
-  private onElementMoved?: (element: IElement, deltaX: number, deltaY: number) => void;
+  private onElementMoved?: (element: IElement, deltaX: number, deltaY: number, oldBounds?: BoundingBox) => void;
   private onPathDrawing?: (points: Point[]) => void;
   private onPathComplete?: (points: Point[]) => void;
   private onRectangleDrawing?: (start: Point, end: Point) => void;
@@ -90,7 +90,7 @@ export class InteractionManager {
    */
   setCallbacks(callbacks: {
     onElementSelected?: (element: IElement | null) => void;
-    onElementMoved?: (element: IElement, deltaX: number, deltaY: number) => void;
+    onElementMoved?: (element: IElement, deltaX: number, deltaY: number, oldBounds?: BoundingBox) => void;
     onPathDrawing?: (points: Point[]) => void;
     onPathComplete?: (points: Point[]) => void;
     onRectangleDrawing?: (start: Point, end: Point) => void;
@@ -206,6 +206,9 @@ export class InteractionManager {
       const deltaX = canvasPoint.x - this.state.startPoint.x;
       const deltaY = canvasPoint.y - this.state.startPoint.y;
 
+      // 记录旧位置（用于清除残影）
+      const oldBounds = this.state.draggedElement.getBoundingBox();
+
       // 更新元素位置
       this.state.draggedElement.x += deltaX;
       this.state.draggedElement.y += deltaY;
@@ -224,9 +227,9 @@ export class InteractionManager {
       // 更新空间索引
       this.spatialIndex.update(this.state.draggedElement);
 
-      // 触发回调
+      // 触发回调（传入旧位置，用于清除残影）
       if (this.onElementMoved) {
-        this.onElementMoved(this.state.draggedElement, deltaX, deltaY);
+        this.onElementMoved(this.state.draggedElement, deltaX, deltaY, oldBounds);
       }
 
       // 更新起始点

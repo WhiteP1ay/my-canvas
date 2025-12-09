@@ -80,8 +80,10 @@ export class CanvasEngine {
         this.renderer.markDirty();
         // 注意：外部回调通过 onElementSelected 方法设置
       },
-      onElementMoved: (element) => {
-        this.renderer.markDirtyRegion(element.getBoundingBox());
+      onElementMoved: () => {
+        // 拖拽时强制全量重绘，避免残影问题
+        // 因为选中边框可能超出元素边界框，脏矩形优化难以精确处理
+        this.renderer.markDirty();
       },
       onPathDrawing: (points: Point[]) => {
         // 实时更新路径预览
@@ -91,6 +93,7 @@ export class CanvasEngine {
       },
       onPathComplete: () => {
         // 路径绘制完成，清除临时预览
+        // 注意：当外部设置 onPathComplete 回调时，会在回调中清除
         this.tempPathPoints = null;
         this.renderer.markDirty();
       },
@@ -101,6 +104,7 @@ export class CanvasEngine {
       },
       onRectangleComplete: () => {
         // 矩形绘制完成，清除临时预览
+        // 注意：当外部设置 onRectangleComplete 回调时，会在回调中清除
         this.tempRectangle = null;
         this.renderer.markDirty();
       },
@@ -246,7 +250,13 @@ export class CanvasEngine {
     const selected = this.interactionManager.getSelectedElement();
     if (selected) {
       const removed = this.removeElement(selected.id);
-      this.clearSelection();
+      if (removed) {
+        this.clearSelection();
+        // 通知外部选中状态变化
+        if (this.interactionManager['onElementSelected']) {
+          this.interactionManager['onElementSelected'](null);
+        }
+      }
       return removed;
     }
     return false;
@@ -256,8 +266,16 @@ export class CanvasEngine {
    * 设置路径绘制完成回调
    */
   onPathComplete(callback: (points: Point[]) => void): void {
+    const externalCallback = callback;
+    // 先执行内部逻辑（清除临时预览），再执行外部回调
     this.interactionManager.setCallbacks({
-      onPathComplete: callback,
+      onPathComplete: (points: Point[]) => {
+        // 先清除临时预览
+        this.tempPathPoints = null;
+        this.renderer.markDirty();
+        // 再执行外部回调
+        externalCallback(points);
+      },
     });
   }
 
@@ -265,8 +283,16 @@ export class CanvasEngine {
    * 设置矩形绘制完成回调
    */
   onRectangleComplete(callback: (start: Point, end: Point) => void): void {
+    const externalCallback = callback;
+    // 先执行内部逻辑（清除临时预览），再执行外部回调
     this.interactionManager.setCallbacks({
-      onRectangleComplete: callback,
+      onRectangleComplete: (start: Point, end: Point) => {
+        // 先清除临时预览
+        this.tempRectangle = null;
+        this.renderer.markDirty();
+        // 再执行外部回调
+        externalCallback(start, end);
+      },
     });
   }
 
