@@ -114,6 +114,7 @@ class QuadTreeNode {
    */
   query(bounds: BoundingBox): IElement[] {
     const results: IElement[] = [];
+    const seen = new Set<string>(); // 使用 Set 去重，避免横跨多个象限的元素被重复渲染
 
     // 如果查询区域与当前节点不相交，返回空
     if (!rectsIntersect(this.bounds, bounds)) {
@@ -123,14 +124,25 @@ class QuadTreeNode {
     // 如果有子节点，递归查询子节点
     if (this.children) {
       for (const child of this.children) {
-        results.push(...child.query(bounds));
+        const childResults = child.query(bounds);
+        for (const element of childResults) {
+          // 去重：如果元素已经在结果中，跳过
+          if (!seen.has(element.id)) {
+            seen.add(element.id);
+            results.push(element);
+          }
+        }
       }
     } else {
       // 检查当前节点的元素是否在查询区域内
       for (const element of this.elements) {
         const elementBounds = element.getBoundingBox();
         if (rectsIntersect(bounds, elementBounds)) {
-          results.push(element);
+          // 去重：如果元素已经在结果中，跳过
+          if (!seen.has(element.id)) {
+            seen.add(element.id);
+            results.push(element);
+          }
         }
       }
     }

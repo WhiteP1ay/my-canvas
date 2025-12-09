@@ -1,131 +1,28 @@
-# 性能优化文档
+# Canvas 协作白板引擎 - 性能优化文档
 
-本文档记录了 Canvas 引擎的性能优化策略和实现细节。
+## 🚀 性能优化策略
 
-## 📊 性能目标
+1. 在添加元素、移动元素时，标记脏区域，并且只重绘变化区域
+2. 在需要全局重绘时，会获取视口边界，仅渲染可见元素
+3. 底层基于四叉树空间索引，增加元素查询、变更效率
+4. 基于 requestAnimationFrame 渲染，使交互与浏览器刷新率同步
 
-- **10,000+ 元素**：保持 60 FPS 流畅度
-- **拖拽操作**：单元素拖拽时只重绘相关区域
-- **缩放/平移**：只重绘视口内的元素
-- **绘制操作**：实时预览不阻塞主线程
+## 🔄 数据流
 
-## 🚀 已实现的优化
-
-### 1. 脏矩形技术 (Dirty Rectangle)
-
-**实现位置**: `packages/core/src/Renderer.ts`
-
-**优化原理**:
-- 只重绘发生变化的部分区域，而不是整个画布
-- 使用 `markDirtyRegion()` 标记需要重绘的区域
-- 渲染时只清除和重绘脏矩形区域
-
-**性能提升**:
-- 从 O(n) 全量重绘降低到 O(k)，k 为脏区域内的元素数量
-- 假设 10,000 个元素，只有 100 个在脏区域内，性能提升 **100 倍**
-
-**代码示例**:
-```typescript
-// 标记脏区域
-this.renderer.markDirtyRegion(element.getBoundingBox());
-
-// 渲染时只重绘脏区域
-for (const region of this.dirtyRegions) {
-  const elementsInRegion = this.spatialIndex.query(bounds);
-  this.renderElements(elementsInRegion);
-}
 ```
-
-### 2. 视口裁剪 (Viewport Culling)
-
-**实现位置**: `packages/core/src/Renderer.ts:getViewportBounds()`
-
-**优化原理**:
-- 只渲染视口（可见区域）内的元素
-- 使用空间索引查询视口边界内的元素
-- 缩放/平移时只重绘视口区域
-
-**性能提升**:
-- 假设 10,000 个元素，只有 500 个在视口内，性能提升 **20 倍**
-- 缩放/平移时不再全量重绘
-
-**代码示例**:
-```typescript
-// 获取视口边界
-const viewportBounds = this.getViewportBounds();
-const visibleElements = this.spatialIndex.query(viewportBounds);
-this.renderElements(visibleElements);
+用户交互
+  ↓
+InteractionManager (处理事件)
+  ↓
+ElementManager (更新元素状态)
+  ↓
+SpatialIndex (更新空间索引)
+  ↓
+Renderer (标记脏区域)
+  ↓
+CanvasEngine (触发渲染循环)
+  ↓
+Renderer (执行渲染)
+  ↓
+Canvas (显示结果)
 ```
-
-### 3. 四叉树空间索引
-
-**实现位置**: `packages/core/src/SpatialIndex.ts`
-
-**优化原理**:
-- 使用四叉树将空间划分为多个区域
-- 查询时只遍历相关子树，跳过不相关区域
-- 时间复杂度从 O(n) 降低到 O(log n)
-
-**性能提升**:
-- 10,000 个元素：从 10,000 次比较降低到约 13 次（log₂(10000) ≈ 13）
-- 性能提升 **770 倍**
-
-**代码示例**:
-```typescript
-// 查询指定区域内的元素
-const elements = this.spatialIndex.query(bounds);
-
-// 查询指定点处的元素（从后往前，上层优先）
-const element = this.spatialIndex.queryPoint(point);
-```
-
-### 4. 渲染循环优化
-
-**实现位置**: `packages/core/src/CanvasEngine.ts:startRenderLoop()`
-
-**优化原理**:
-- 只在有脏区域时才执行渲染
-- 避免每帧都调用 `getAll()` 获取所有元素
-- 脏矩形模式下使用空间索引查询，不需要所有元素
-
-**性能提升**:
-- 无变化时跳过渲染，节省 CPU
-- 避免不必要的 `getAll()` 调用（O(n) 操作）
-
-**代码示例**:
-```typescript
-const hasDirtyRegions = this.renderer.hasDirtyRegions();
-if (hasDirtyRegions || hasTempPreview) {
-  // 只在需要时获取所有元素
-  const elements = hasTempPreview ? this.elementManager.getAll() : [];
-  this.renderer.render(elements, hasTempPreview);
-}
-```
-
-### 5. 设备像素比适配
-
-**实现位置**: `packages/core/src/Renderer.ts:setupHighQualityRendering()`
-
-**优化原理**:
-- 根据 `devicePixelRatio` 调整 Canvas 实际分辨率
-- 高 DPI 屏幕上提供清晰的渲染效果
-
-**代码示例**:
-```typescript
-const dpr = window.devicePixelRatio || 1;
-this.canvas.width = rect.width * dpr;
-this.canvas.height = rect.height * dpr;
-this.ctx.scale(dpr, dpr);
-```
-## 📝 总结
-
-通过脏矩形技术、视口裁剪、空间索引等优化，成功实现了 **10,000+ 元素保持 60 FPS** 的目标。
-
-关键优化点：
-- ✅ 拖拽时只重绘相关区域（50x 提升）
-- ✅ 缩放/平移时只重绘视口（20x 提升）
-- ✅ 使用四叉树快速查询（770x 提升）
-- ✅ 渲染循环跳过无变化帧
-
-这些优化使得引擎能够处理大规模画布，同时保持流畅的用户体验。
-

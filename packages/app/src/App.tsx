@@ -2,13 +2,16 @@ import { useState, useRef } from "react";
 import { Canvas } from "@canvas/canvas";
 import { InteractionMode, CanvasEngine } from "@canvas/core";
 import type { IElement } from "@canvas/elements";
-import { generateRandomElements, formatPerformanceResult, logPerformanceResult } from "./utils/performanceTest";
+import {
+  generateRandomElements,
+  formatPerformanceResult,
+  logPerformanceResult,
+} from "./utils/performanceTest";
 import "./App.css";
 
 function App() {
   const [mode, setMode] = useState<InteractionMode>(InteractionMode.SELECT);
   const [selectedElement, setSelectedElement] = useState<IElement | null>(null);
-  const [elementCount, setElementCount] = useState(0);
   const engineRef = useRef<CanvasEngine | null>(null);
 
   /**
@@ -20,8 +23,7 @@ function App() {
     }
 
     const result = generateRandomElements(engineRef.current, 10000, 600, 400);
-    setElementCount(result.count);
-    
+
     logPerformanceResult(result);
     alert(formatPerformanceResult(result));
   };
@@ -36,36 +38,33 @@ function App() {
 
       <div className="button-group">
         <button
-          className={`btn btn-mode ${mode === InteractionMode.SELECT ? 'active' : ''}`}
+          className={`btn btn-mode ${
+            mode === InteractionMode.SELECT ? "active" : ""
+          }`}
           onClick={() => setMode(InteractionMode.SELECT)}
         >
           选择模式
         </button>
         <button
-          className={`btn btn-mode ${mode === InteractionMode.PEN ? 'active' : ''}`}
+          className={`btn btn-mode ${
+            mode === InteractionMode.PEN ? "active" : ""
+          }`}
           onClick={() => setMode(InteractionMode.PEN)}
         >
           画笔
         </button>
         <button
-          className={`btn btn-mode ${mode === InteractionMode.RECTANGLE ? 'active' : ''}`}
+          className={`btn btn-mode ${
+            mode === InteractionMode.RECTANGLE ? "active" : ""
+          }`}
           onClick={() => setMode(InteractionMode.RECTANGLE)}
         >
           矩形
         </button>
-        <button
-          className="btn btn-performance"
-          onClick={handlePerformanceTest}
-        >
+        <button className="btn btn-performance" onClick={handlePerformanceTest}>
           生成 10,000 个元素（性能测试）
         </button>
       </div>
-
-      {elementCount > 0 && (
-        <div className="element-count">
-          当前画布元素数量: {elementCount}
-        </div>
-      )}
 
       <div className="canvas-container">
         <Canvas
