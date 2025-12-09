@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "baseUrl": ".",
+    "paths": {
+      "@canvas/math": ["../math/src"],
+      "@canvas/elements": ["../elements/src"],
+      "@canvas/core": ["../core/src"],
+      "@canvas/canvas": ["../canvas/src"]
+    }
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/app" },
+    { "path": "./packages/canvas" },
+    { "path": "./packages/core" },
+    { "path": "./packages/elements" },
+    { "path": "./packages/math" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}

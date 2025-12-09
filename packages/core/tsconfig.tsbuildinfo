@@ -1,0 +1,1 @@
+{"root":["./src/canvasengine.ts","./src/elementmanager.ts","./src/interactionmanager.ts","./src/renderer.ts","./src/spatialindex.ts","./src/index.ts","./src/utils.ts"],"version":"5.9.3"}
